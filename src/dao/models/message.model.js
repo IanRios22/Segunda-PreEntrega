@@ -4,6 +4,6 @@ const SchemaSMS = new Schema({
     user: String,
     message: String,
 },
-    { timestamps: true });
+    { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 export const MessageModel = model(collectionsms, SchemaSMS)

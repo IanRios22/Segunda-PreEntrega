@@ -1,57 +1,84 @@
-import { productModel } from "../../models/product.model.js";
-
+import { productsModel } from "../../models/product.model.js"
 export default class ProductDaoMongoDB {
-    async getAll() {
+    categories = async () => {
         try {
-            const response = await productModel.find({}).lean();
-            return response;
-        } catch (error) {
-            console.log(error);
+            const categories = await productsModel.aggregate([
+                {
+                    $group: {
+                        _id: null,
+                        categories: { $addToSet: "$category" }
+                    }
+                }
+            ])
+
+            return categories[0].categories
+
         }
+        catch (err) {
+            console.log(err);
+            return err
+        }
+
     }
-    async getProductsView() {
+
+    getProductsView = async () => {
         try {
-            return await productModel.find().lean();
+            return await productsModel.find().lean();
+
         } catch (err) {
             return err
         }
     };
 
-    async getById(id) {
+    getProducts = async (filter, options) => {
         try {
-            const response = await productModel.findById(id);
-            return response;
-        } catch (error) {
-            console.log(error);
+            //  return await productsModel.find().lean();
+            return await productsModel.paginate(filter, options);
+        } catch (err) {
+            return err
         }
     }
 
-    async create(obj) {
+
+    getProductById = async (id) => {
         try {
-            const response = await productModel.create(obj);
-            return response;
-        } catch (error) {
-            console.log(error);
+            return await productsModel.findById(id).populate('carts')
+
+        } catch (err) {
+            return { error: err.message }
         }
+
     }
 
-    async update(id, obj) {
+
+    addProduct = async (product) => {
         try {
-            const response = await productModel.findByIdAndUpdate(id, obj, {
-                new: true,
-            });
-            return response;
-        } catch (error) {
-            console.log(error);
+            await productsModel.create(product);
+            return await productsModel.findOne({ title: product.title }).explain();
         }
+        catch (err) {
+            return err
+        }
+
     }
 
-    async delete(id) {
+
+    updateProduct = async (id, product) => {
         try {
-            const response = await productModel.findByIdAndDelete(id);
-            return response;
-        } catch (error) {
-            console.log(error);
+            return await productsModel.findByIdAndUpdate(id, { $set: product })
+        } catch (err) {
+            return err
         }
+
+    }
+
+
+    deleteProduct = async (id) => {
+        try {
+            return await productsModel.findByIdAndDelete(id);
+        } catch (err) {
+            return err
+        }
+
     }
 }

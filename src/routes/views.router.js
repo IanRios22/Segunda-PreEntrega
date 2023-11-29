@@ -7,7 +7,7 @@ const prodMan = new ProductDaoMongoDB(__dirname + '/dao/db/products.json');
 const routerView = new Router();
 
 routerView.get('/', async (req, res) => {
-    const listProd = await prodMan.getAll();
+    const listProd = await prodMan.getProductsView();
     res.render("home", { listProd });
 })
 

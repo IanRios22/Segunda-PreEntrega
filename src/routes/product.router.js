@@ -3,70 +3,107 @@ import { Router } from "express";
 const router = new Router();
 import { __dirname } from "../utils.js";
 import ProductDaoMongoDB from "../dao/controllers/mongoDB/product.manager.mongoDB.js";
-const pmDao = new ProductDaoMongoDB();
+const pm = new ProductDaoMongoDB();
 //Esto era con filesystem pero ahora cambio
 //instanciamos mi clase
 // import { ProductManager } from "../dao/controllers/filesystem/product.manager.js";
 // const productManager = new ProductManager(__dirname + '/dao/db/products.json');
 
+router.get('/', async (req, res) => {
+    try {
+        let { limit, page, sort, category } = req.query
+        console.log(req.originalUrl);
+        console.log(req.originalUrl.includes('page'));
 
-router.get("/", async (req, res) => {
-    try {
-        const { limit } = req.query;
-        const products = await pmDao.getAll();
-        if (!limit) res.status(200).json(products);
-        else {
-            const productsByLimit = await pmDao.getProductsByLimit(limit);
-            res.status(200).json(productsByLimit);
+        const options = {
+            page: Number(page) || 1,
+            limit: Number(limit) || 2,
+            sort: { price: Number(sort) }
+        };
+
+        if (!(options.sort.price === -1 || options.sort.price === 1)) {
+            delete options.sort
         }
-    } catch (error) {
-        res.status(500).json(error.message);
+
+
+        const links = (products) => {
+            let prevLink;
+            let nextLink;
+            if (req.originalUrl.includes('page')) {
+                // Si la URL original contiene el parámetro 'page', entonces:
+
+                prevLink = products.hasPrevPage ? req.originalUrl.replace(`page=${products.page}`, `page=${products.prevPage}`) : null;
+                nextLink = products.hasNextPage ? req.originalUrl.replace(`page=${products.page}`, `page=${products.nextPage}`) : null;
+                return { prevLink, nextLink };
+            }
+            if (!req.originalUrl.includes('?')) {
+                // Si la URL original NO contiene el carácter '?', entonces:
+
+                prevLink = products.hasPrevPage ? req.originalUrl.concat(`?page=${products.prevPage}`) : null;
+                nextLink = products.hasNextPage ? req.originalUrl.concat(`?page=${products.nextPage}`) : null;
+                return { prevLink, nextLink };
+            }
+            // Si la URL original contiene el carácter '?' (otros parámetros), entonces:
+
+            prevLink = products.hasPrevPage ? req.originalUrl.concat(`&page=${products.prevPage}`) : null;
+            nextLink = products.hasNextPage ? req.originalUrl.concat(`&page=${products.nextPage}`) : null;
+            console.log(prevLink)
+            console.log(nextLink)
+
+            return { prevLink, nextLink };
+
+        }
+
+        // Devuelve un array con las categorias disponibles y compara con la query "category"
+        const categories = await pm.categories()
+
+        const result = categories.some(categ => categ === category)
+        if (result) {
+
+            const products = await pm.getProducts({ category }, options);
+            const { prevLink, nextLink } = links(products);
+            const { totalPages, prevPage, nextPage, hasNextPage, hasPrevPage, docs } = products
+            return res.status(200).send({ status: 'success', payload: docs, totalPages, prevPage, nextPage, hasNextPage, hasPrevPage, prevLink, nextLink });
+        }
+
+        const products = await pm.getProducts({}, options);
+        // console.log(products, 'Product');
+        const { totalPages, prevPage, nextPage, hasNextPage, hasPrevPage, docs } = products
+        const { prevLink, nextLink } = links(products);
+        return res.status(200).send({ status: 'success', payload: docs, totalPages, prevPage, nextPage, hasNextPage, hasPrevPage, prevLink, nextLink });
+    } catch (err) {
+        console.log(err);
     }
-});
-router.get("/:id", async (req, res) => {
-    try {
-        const { id } = req.params;
-        const product = await pmDao.getById(Number(id));
-        if (!product) res.status(404).json({ message: "product not found" });
-        else res.status(200).json(product);
-    } catch (error) {
-        res.status(500).json(error.message);
-    }
+
+
+})
+
+router.get("/:pid", async (req, res) => {
+    const { pid } = req.params
+    const productfind = await pm.getProductById(pid);
+    res.json({ status: "success", productfind });
 });
 
 router.post("/", async (req, res) => {
-    try {
-        const productCreated = await pmDao.create(req.body);
-        socketServer.emit("productos", await pmDao.getAll());
-        res.status(200).json(productCreated);
-    } catch (error) {
-        res.status(500).json(error.message);
-    }
+    const obj = req.body
+    const newproduct = await pm.addProduct(obj);
+    res.json({ status: "success", newproduct });
 });
 
-router.put("/:id", async (req, res) => {
-    try {
-        const product = { ...req.body };
-        const { id } = req.params;
-        const idNumber = Number(id);
-        const productOk = await pmDao.getById(idNumber);
-        if (!productOk) res.status(404).json({ message: "product not found" });
-        else await pmDao.update(product, idNumber);
-        res.status(200).json({ message: `product id: ${id} updated` });
-    } catch (error) {
-        res.status(500).json(error.message);
-    }
+router.put("/:pid", async (req, res) => {
+    const { pid } = req.params
+    const obj = req.body
+    const updatedproduct = await pm.updateProduct(pid, obj);
+    console.log(updatedproduct)
+    res.json({ status: "success", updatedproduct });
 });
 
-router.delete("/:id", async (req, res) => {
-    try {
-        const { id } = req.params;
-        const idNumber = Number(id);
-        await pmDao.delete(idNumber);
-        res.json({ message: `Product id: ${idNumber} deleted` });
-    } catch (error) {
-        res.status(500).json(error.message);
-    }
+
+router.delete("/:pid", async (req, res) => {
+    const id = req.params.pid
+    const deleteproduct = await pm.deleteProduct(id);
+    res.json({ status: "success", deleteproduct });
 });
 
-export default router;
+
+export default router

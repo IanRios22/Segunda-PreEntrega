@@ -11,7 +11,7 @@ const socketProducts = (socketServer) => {
 
         //Con esto agregamos los productos
         socket.on("addProduct", async (obj) => {
-            await prodMan.create(obj)
+            await prodMan.addProduct(obj)
             //mostramos todos los productos
             const listadeproductos = await prodMan.getProductsView()
             socketServer.emit("sendProducts", listadeproductos)
